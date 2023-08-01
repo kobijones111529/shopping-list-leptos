@@ -4,8 +4,30 @@ use leptos_router::*;
 
 #[component]
 pub fn Home(cx: Scope) -> impl IntoView {
+    enum ItemError {
+        Empty,
+    }
+
+    enum InputError {
+        Item(ItemError),
+    }
+
+    fn validate(data: AddItem) -> Result<AddItem, InputError> {
+        let item = data.item.trim();
+
+        if item.is_empty() {
+            return Err(InputError::Item(ItemError::Empty));
+        }
+
+        Ok(AddItem {
+            item: item.to_owned(),
+        })
+    }
+
     let items = create_blocking_resource(cx, || (), move |_| async move { get_items(cx).await });
     let add_item = create_server_action::<AddItem>(cx);
+
+    let (item_input, set_item_input) = create_signal(cx, String::new());
 
     create_effect(cx, move |_| {
         if !add_item.pending().get() {
@@ -13,7 +35,23 @@ pub fn Home(cx: Scope) -> impl IntoView {
         }
     });
 
-    let on_add_item = move |_: SubmitEvent| {};
+    let on_add_item = move |ev: SubmitEvent| {
+        ev.prevent_default();
+
+        match AddItem::from_event(&ev) {
+            Ok(input) => match validate(input) {
+                Ok(input) => {
+                    add_item.dispatch(input);
+                }
+                Err(InputError::Item(ItemError::Empty)) => {
+                    log!("Input cannot be empty");
+                }
+            },
+            Err(_) => {
+                log!("Error submitting form");
+            }
+        }
+    };
 
     let show_items = move |items: Vec<Item>| {
         view! { cx,
@@ -44,7 +82,12 @@ pub fn Home(cx: Scope) -> impl IntoView {
             }}
         </Transition>
         <ActionForm action=add_item on:submit=on_add_item>
-            <input type="text" name="item" />
+            <input
+                type="text"
+                name="item"
+                on:input=move |ev| set_item_input.set(event_target_value(&ev))
+                prop:value=item_input
+            />
             <button type="submit">"Submit"</button>
         </ActionForm>
     }
