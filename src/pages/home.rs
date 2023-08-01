@@ -44,13 +44,14 @@ pub fn Home(cx: Scope) -> impl IntoView {
             }}
         </Transition>
         <ActionForm action=add_item on:submit=on_add_item>
+            <input type="text" name="item" />
             <button type="submit">"Submit"</button>
         </ActionForm>
     }
 }
 
 #[server(AddItem, "/api")]
-async fn add_item(cx: Scope) -> Result<(), ServerFnError> {
+async fn add_item(cx: Scope, item: String) -> Result<(), ServerFnError> {
     use crate::ItemStore;
     use actix_web::web::Data;
     use leptos_actix::extract;
@@ -58,7 +59,7 @@ async fn add_item(cx: Scope) -> Result<(), ServerFnError> {
 
     let res = extract(cx, |items: Data<Mutex<ItemStore>>| async move {
         let mut items = items.lock()?;
-        items.add("Hi!".to_owned());
+        items.add(item);
         Ok(())
     })
     .await;
